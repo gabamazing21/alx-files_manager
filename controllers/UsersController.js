@@ -1,5 +1,6 @@
 import sha1 from 'sha1';
 import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 
 const UserController = {
   async postNew(req, res) {
@@ -33,7 +34,29 @@ const UserController = {
     // Inser the new user into the database
     const result = await usersCollection.insertOne(newUser);
 
-    return res.status(200).json({ id: result.insertedId, email });
+    return res.status(201).json({ id: result.insertedId, email });
+  },
+
+  async getMe(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized no token' });
+    }
+
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized no user id' });
+    }
+
+    const usersCollection = await dbClient.usersCollection();
+    const user = await usersCollection.findOne({ _id: dbClient.getObjectId(userId) });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    return res.status(200).json({ id: user._id, email: user.email });
   },
 
 };
