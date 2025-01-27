@@ -38,6 +38,11 @@ class DBClient {
       return 0;
     }
   }
+
+  async usersCollection() {
+    const db = this.client.db(this.dbName);
+    return db.collection('users');
+  }
 }
 
 // create and export an instance of a class
