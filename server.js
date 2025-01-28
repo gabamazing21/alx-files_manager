@@ -1,8 +1,11 @@
 import express from 'express';
 import router from './routes/index';
 import redisClient from './utils/redis';
+import dbClient from './utils/db';
 
 const app = express();
+const dbALive = dbClient.isAlive();
+console.log(dbALive);
 const port = process.env.PORT || 5000;
 
 app.use(express.json());
