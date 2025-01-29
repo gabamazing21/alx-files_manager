@@ -7,7 +7,6 @@ import path from 'path';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
-const readFileAsync = promisify(fs.readFile);
 
 const FileController = {
   async postUpload(req, res) {
@@ -336,7 +335,7 @@ const FileController = {
       const mimeType = mime.lookup(file.name) || 'application/octet-stream';
       res.setHeader('Content-Type', mimeType);
 
-      const fileContent = readFileAsync(file.localPath);
+      const fileContent = await fs.readFile(file.localPath);
       return res.status(200).send(fileContent);
     } catch (error) {
       return res.status(404).json({ error: 'Not Found' });
