@@ -133,6 +133,11 @@ const FileController = {
     if (!file) {
       return res.status(404).json({ error: 'Not Found' });
     }
+
+    // check if the file belongs to the authenticated user
+    if (file.userId.toString() !== userId.toString()) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
     return res.status(200).json({
       id: file._id,
       userId: file.userId,
