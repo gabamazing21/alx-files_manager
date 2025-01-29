@@ -43,6 +43,11 @@ class DBClient {
     const db = this.client.db(this.dbName);
     return db.collection('users');
   }
+
+  async fileCollection() {
+    const db = this.client.db(this.dbName);
+    return db.collection('files');
+  }
 }
 
 // create and export an instance of a class
