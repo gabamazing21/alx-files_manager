@@ -172,7 +172,7 @@ const FileController = {
 
     return res.status(200).json(
       files.map((file) => ({
-        id: file._id,
+        id: file,
         userId: file.userId,
         name: file.name,
         type: file.type,
