@@ -186,6 +186,90 @@ const FileController = {
       })),
     );
   },
+  async putPublish(req, res) {
+    const token = req.headers['x-token'];
+    const filelocation = await dbClient.fileCollection();
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const filedId = req.params.id;
+
+    if (!ObjectId.isValid(filedId)) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+    const file = await filelocation.findOne({
+      _id: new ObjectId(filedId),
+      userId: new ObjectId(userId),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+
+    // check if the file belongs to the authenticated user
+    if (file.userId.toString() !== userId.toString()) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+    file.isPublic = true;
+
+    return res.status(200).json({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
+  },
+  async putUnpublish(req, res) {
+    const token = req.headers['x-token'];
+    const filelocation = await dbClient.fileCollection();
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const filedId = req.params.id;
+
+    if (!ObjectId.isValid(filedId)) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+    const file = await filelocation.findOne({
+      _id: new ObjectId(filedId),
+      userId: new ObjectId(userId),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+
+    // check if the file belongs to the authenticated user
+    if (file.userId.toString() !== userId.toString()) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
+    file.isPublic = false;
+
+    return res.status(200).json({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
+  },
 };
 
 export default FileController;
