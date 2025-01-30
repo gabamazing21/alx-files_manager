@@ -189,6 +189,8 @@ const FileController = {
   async putPublish(req, res) {
     const token = req.headers['x-token'];
     const filelocation = await dbClient.fileCollection();
+    const usersCollection = await dbClient.usersCollection();
+    const filedId = req.params.id;
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -198,8 +200,11 @@ const FileController = {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
-    const filedId = req.params.id;
+    // check if user exist in db for that particular user
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     if (!ObjectId.isValid(filedId)) {
       return res.status(404).json({ error: 'Not Found' });
@@ -208,15 +213,16 @@ const FileController = {
       _id: new ObjectId(filedId),
       userId: new ObjectId(userId),
     });
+    // check if file dcoument link with the user
+    if (file.userId.toString() !== userId) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
 
     if (!file) {
       return res.status(404).json({ error: 'Not Found' });
     }
 
     // check if the file belongs to the authenticated user
-    if (file.userId.toString() !== userId.toString()) {
-      return res.status(404).json({ error: 'Not Found' });
-    }
     await filelocation.updateOne(
       { _id: new ObjectId(filedId) },
       { $set: { isPublic: true } },
@@ -234,6 +240,8 @@ const FileController = {
   async putUnpublish(req, res) {
     const token = req.headers['x-token'];
     const filelocation = await dbClient.fileCollection();
+    const usersCollection = await dbClient.usersCollection();
+    const filedId = req.params.id;
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -243,8 +251,11 @@ const FileController = {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
-    const filedId = req.params.id;
+    // check if user exist in db for that particular user
+    const user = usersCollection.findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     if (!ObjectId.isValid(filedId)) {
       return res.status(404).json({ error: 'Not Found' });
@@ -254,10 +265,11 @@ const FileController = {
       userId: new ObjectId(userId),
     });
 
-    // check if the file belongs to the authenticated user
-    if (file.userId.toString() !== userId.toString()) {
-      return res.status(404).json({ error: 'Not Found string' });
+    // check if file dcoument link with the user
+    if (file.userId.toString() !== userId) {
+      return res.status(404).json({ error: 'Not Found' });
     }
+
     if (!file) {
       return res.status(404).json({ error: 'Not Found' });
     }
@@ -282,6 +294,8 @@ const FileController = {
   },
   async getFile(req, res) {
     const token = req.headers['x-token'];
+    const filedId = req.params.id;
+    const { size } = req.query;
     const filelocation = await dbClient.fileCollection();
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -292,8 +306,6 @@ const FileController = {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-
-    const filedId = req.params.id;
 
     if (!ObjectId.isValid(filedId)) {
       return res.status(404).json({ error: 'Not Found' });
@@ -320,9 +332,14 @@ const FileController = {
     if (file.type === 'folder') {
       return res.status(400).json({ error: "A folder doesn't have content" });
     }
+    let filepath;
+    if (size && [100, 250, 500].includes(parseInt(size, 10))) {
+      filepath = `${file.localPath}_${size}`;
+    }
     // check if the fileis locally present
-
     try {
+      await fs.access(filepath);
+      res.sendFile(filepath);
       await fs.access(file.localPath);
     } catch (error) {
       return res.status(400).json({ error: 'Not Found' });
