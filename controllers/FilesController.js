@@ -1,18 +1,18 @@
 import { v4 as uuidv4 } from 'uuid';
 import { promises as fs } from 'fs';
 import { ObjectId } from 'mongodb';
-import { promisify } from 'util';
 import mime from 'mime-types';
+import Queue from 'bull/lib/queue';
 import path from 'path';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
-
 
 const FileController = {
   async postUpload(req, res) {
     const token = req.headers['x-token'];
     const filelocation = await dbClient.fileCollection();
     const usersCollection = await dbClient.usersCollection();
+    const fileQueue = new Queue('fileQueue');
 
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -81,7 +81,6 @@ const FileController = {
         parentId,
       });
     }
-
     try {
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
 
@@ -97,6 +96,9 @@ const FileController = {
       fileDocument.localPath = filePath;
 
       const result = await filelocation.insertOne(fileDocument);
+      if (data.type === 'image') {
+        fileQueue.add({ fileId: result.insertedId, userId: user._id });
+      }
       return res.status(201).json({
         id: result.insertedId,
         userId,
@@ -307,11 +309,11 @@ const FileController = {
 
     // check if the file belongs to the authenticated user
     if (file.userId.toString() !== userId.toString()) {
-      return res.status(404).json({ error: 'Not Found string' });
+      return res.status(404).json({ error: 'Not Found' });
     }
     // check if file is public
     if (file.isPublic === false) {
-      return res.status(404).json({ error: 'Not Found public' });
+      return res.status(404).json({ error: 'Not Found' });
     }
 
     // check if the file is a folder
@@ -323,10 +325,10 @@ const FileController = {
     try {
       await fs.access(file.localPath);
     } catch (error) {
-      return res.status(400).json({ error: 'Not Found file not exist' });
+      return res.status(400).json({ error: 'Not Found' });
     }
     if (!file.localPath) {
-      return res.status(400).json({ error: 'Not Found file not exist' });
+      return res.status(400).json({ error: 'Not Found' });
     }
     try {
       // const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
