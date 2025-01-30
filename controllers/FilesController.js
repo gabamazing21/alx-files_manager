@@ -274,10 +274,6 @@ const FileController = {
       return res.status(404).json({ error: 'Not Found' });
     }
 
-    // check if the file belongs to the authenticated user
-    if (file.userId.toString() !== userId.toString()) {
-      return res.status(404).json({ error: 'Not Found' });
-    }
     await filelocation.updateOne(
       { _id: new ObjectId(filedId) },
       { $set: { isPublic: false } },
@@ -296,69 +292,75 @@ const FileController = {
     const token = req.headers['x-token'];
     const filedId = req.params.id;
     const { size } = req.query;
+
     const filelocation = await dbClient.fileCollection();
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const key = `auth_${token}`;
-    const userId = await redisClient.get(key);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    // const usersCollection = await dbClient.usersCollection();
+    // validate fileId format
     if (!ObjectId.isValid(filedId)) {
       return res.status(404).json({ error: 'Not Found' });
     }
+    // retrieve file from db
     const file = await filelocation.findOne({
       _id: new ObjectId(filedId),
-      userId: new ObjectId(userId),
     });
 
     if (!file) {
       return res.status(404).json({ error: 'Not Found' });
     }
 
-    // check if the file belongs to the authenticated user
-    if (file.userId.toString() !== userId.toString()) {
-      return res.status(404).json({ error: 'Not Found' });
-    }
-    // check if file is public
-    if (file.isPublic === false) {
-      return res.status(404).json({ error: 'Not Found' });
+    // authenticate user if token exists
+    let userId = null;
+
+    if (token) {
+      const key = `auth_${token}`;
+      userId = await redisClient.get(key);
     }
 
+    // check file access
+    if (!file.isPublic && (!userId || file.userId.toString() !== userId)) {
+      return res.status(401).json({ error: 'Not found' });
+    }
+
+    // check if file is a folder
     // check if the file is a folder
     if (file.type === 'folder') {
       return res.status(400).json({ error: "A folder doesn't have content" });
     }
-    let filepath;
-    if (size && [100, 250, 500].includes(parseInt(size, 10))) {
-      filepath = `${file.localPath}_${size}`;
-    }
-    // check if the fileis locally present
-    try {
-      await fs.access(filepath);
-      res.sendFile(filepath);
-      await fs.access(file.localPath);
-    } catch (error) {
-      return res.status(400).json({ error: 'Not Found' });
-    }
-    if (!file.localPath) {
-      return res.status(400).json({ error: 'Not Found' });
-    }
-    try {
-      // const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      // // generate unique filename
-      // const filePath = path.join(folderPath, file.lo);
-      const mimeType = mime.lookup(file.name) || 'application/octet-stream';
-      res.setHeader('Content-Type', mimeType);
 
-      const fileContent = await fs.readFile(file.localPath);
-      return res.status(200).send(fileContent);
-    } catch (error) {
-      return res.status(404).json({ error: 'Not Found' });
+    let filePath = file.localPath;
+    // if size is requested, ensure it's an image
+
+    if (size) {
+      const allowedSizes = [100, 250, 500];
+      if (!allowedSizes.includes(parseInt(size, 10))) {
+        return res.status(400).json({ error: 'Invalid size parameter'});
+      }
+      if (file.type !== 'image') {
+        return res.status(400).json({ error: 'Thumbnails only available for images'})
+      }
+      filePath = `${file.localPath}_${size}`;
     }
+
+    // Check if file exists
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      return res.status(400).json({ error: 'Not Found' });
+    }
+    // Get MIME type
+    const mimeType = mime.lookup(file.name) || 'application/octet-stream';
+    res.setHeader('Content-Type', mimeType);
+
+    if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+      try {
+        const fileContent = await fs.readFile(filePath, 'utf-8'); // read as text
+        return res.status(200).send(fileContent);
+      } catch (error) {
+        return res.status(500).json({ error: 'Error reading file' });
+      }
+    }
+    // otherwise, send as a file (binary content)
+    return res.status(200).send(filePath);
   },
 };
 
