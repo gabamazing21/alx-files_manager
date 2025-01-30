@@ -333,10 +333,10 @@ const FileController = {
     if (size) {
       const allowedSizes = [100, 250, 500];
       if (!allowedSizes.includes(parseInt(size, 10))) {
-        return res.status(400).json({ error: 'Invalid size parameter'});
+        return res.status(400).json({ error: 'Invalid size parameter' });
       }
       if (file.type !== 'image') {
-        return res.status(400).json({ error: 'Thumbnails only available for images'})
+        return res.status(400).json({ error: 'Thumbnails only available for images' });
       }
       filePath = `${file.localPath}_${size}`;
     }
